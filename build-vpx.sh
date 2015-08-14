@@ -2,13 +2,15 @@
 
 TEMP_DIR="temp"
 LIBVPX_DIR="libvpx"
-VPX_FRAMEWORK="VPX.framework"
+VPX_FRAMEWORK="vpx.framework"
 
 echo "Cloning libvpx"
 mkdir $TEMP_DIR
 cd $TEMP_DIR
 git clone --branch v1.4.0 --depth 1 https://git.chromium.org/webm/libvpx.git $LIBVPX_DIR
-cd ..
+cd $LIBVPX_DIR
+git apply ../../iosbuild-diff
+cd ../..
 
 if [ -d "$VPX_FRAMEWORK" ]; then
     echo "Removing $VPX_FRAMEWORK"
