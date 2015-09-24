@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "toxcore"
-  s.version          = "0.0.0-2ab3b14-2"
+  s.version          = "0.0.0-6120b0e"
   s.summary          = "Cocoapods wrapper for toxcore"
   s.homepage         = "https://github.com/Antidote-for-Tox/toxcore"
   s.license          = 'GPLv3'
@@ -32,8 +32,8 @@ Pod::Spec.new do |s|
   s.dependency 'libsodium', '~> 1.0.1'
   s.dependency 'libopus-patched-config', '1.1'
 
-  s.ios.vendored_frameworks = 'vpx.framework'
-  s.osx.vendored_frameworks = 'vpx.framework'
+  s.ios.vendored_frameworks = 'ios/vpx.framework'
+  s.osx.vendored_frameworks = 'osx/vpx.framework'
   s.xcconfig = { 'FRAMEWORK_SEARCH_PATHS' => '"${PODS_ROOT}"'}
 
 end
