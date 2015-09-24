@@ -9,7 +9,7 @@ mkdir $TEMP_DIR
 cd $TEMP_DIR
 git clone --branch v1.4.0 --depth 1 https://git.chromium.org/webm/libvpx.git $LIBVPX_DIR
 cd $LIBVPX_DIR
-git apply ../../iosbuild-diff
+git apply ../../vpx-ios.diff
 cd ../..
 
 if [ -d "$VPX_FRAMEWORK" ]; then
