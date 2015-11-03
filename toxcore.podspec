@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "toxcore"
-  s.version          = "0.0.1-fe86dff"
+  s.version          = "0.0.1-542338a"
   s.summary          = "Cocoapods wrapper for toxcore"
   s.homepage         = "https://github.com/Antidote-for-Tox/toxcore"
   s.license          = 'GPLv3'
@@ -27,8 +27,13 @@ Pod::Spec.new do |s|
   # Preserve the layout of headers in the toxcore directory
   s.header_mappings_dir = 'toxcore'
 
-  s.source_files = 'toxcore/toxcore/*.{m,h}', 'toxcore/toxencryptsave/*.{m,h}', 'toxcore/toxdns/*.{m,h}'
+  s.source_files = 'toxcore/toxcore/*.{m,h}', 'toxcore/toxencryptsave/*.{m,h}', 'toxcore/toxdns/*.{m,h}', 'toxcore/toxav/*.{m,h}'
 
+  s.dependency 'libopus-patched-config', '1.1'
   s.dependency 'libsodium', '~> 1.0.1'
+
+  s.ios.vendored_frameworks = 'ios/vpx.framework'
+  s.osx.vendored_frameworks = 'osx/vpx.framework'
+  s.xcconfig = { 'FRAMEWORK_SEARCH_PATHS' => '"${PODS_ROOT}"'}
 
 end
