@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "toxcore"
-  s.version          = "0.0.1-542338a"
+  s.version          = "0.0.1-0938ba0"
   s.summary          = "Cocoapods wrapper for toxcore"
   s.homepage         = "https://github.com/Antidote-for-Tox/toxcore"
   s.license          = 'GPLv3'
@@ -19,6 +19,8 @@ Pod::Spec.new do |s|
       :tag => s.version.to_s,
       :submodules => true
   }
+
+  s.pod_target_xcconfig = { 'ENABLE_BITCODE' => 'NO', 'OTHER_LDFLAGS' => '-read_only_relocs suppress' }
 
   s.ios.deployment_target = '7.0'
   s.osx.deployment_target = '10.9'
