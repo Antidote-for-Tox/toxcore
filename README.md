@@ -1,6 +1,6 @@
 # toxcore
 
-CocoaPods wrapper for [toxcore](https://github.com/irungentoo/toxcore).
+CocoaPods wrapper for [toxcore](https://github.com/toktok/c-toxcore).
 
 #### Note
 

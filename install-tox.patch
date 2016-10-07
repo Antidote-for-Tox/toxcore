@@ -1,70 +1,31 @@
-diff --git a/toxcore/toxav/Makefile.inc b/toxcore/toxav/Makefile.inc
-index 377588d..2ebe6b9 100644
---- a/toxcore/toxav/Makefile.inc
-+++ b/toxcore/toxav/Makefile.inc
-@@ -8,7 +8,7 @@ libtoxav_la_SOURCES = ../toxav/rtp.h \
-                     ../toxav/rtp.c \
-                     ../toxav/msi.h \
-                     ../toxav/msi.c \
--                    ../toxav/group.h \
-+                    ../toxav/groupav.h \
-                     ../toxav/group.c \
-                     ../toxav/audio.h \
-                     ../toxav/audio.c \
 diff --git a/toxcore/toxav/audio.h b/toxcore/toxav/audio.h
-index b1db744..7b2af93 100644
+index 5f9d7f7..e4b8f61 100644
 --- a/toxcore/toxav/audio.h
 +++ b/toxcore/toxav/audio.h
-@@ -22,7 +22,7 @@
- #ifndef AUDIO_H
- #define AUDIO_H
+@@ -27,7 +27,7 @@
+ #include "../toxcore/logger.h"
+ #include "../toxcore/util.h"
  
 -#include <opus.h>
 +#include "opus.h"
  #include <pthread.h>
  
- #include "toxav.h"
-diff --git a/toxcore/toxav/group.h b/toxcore/toxav/group.h
-index 3355a44..ea18a15 100644
---- a/toxcore/toxav/group.h
-+++ b/toxcore/toxav/group.h
-@@ -19,7 +19,7 @@
-  */
+ struct RTPMessage;
+diff --git a/toxcore/toxav/groupav.h b/toxcore/toxav/groupav.h
+index 1929b17..b791111 100644
+--- a/toxcore/toxav/groupav.h
++++ b/toxcore/toxav/groupav.h
+@@ -21,7 +21,7 @@
+ #include "../toxcore/group.h"
  
  /* Audio encoding/decoding */
 -#include <opus.h>
 +#include "opus.h"
  
- #include "../toxcore/group.h"
+ #define GROUP_AUDIO_PACKET_ID 192
  
-diff --git a/toxcore/toxav/group.m b/toxcore/toxav/group.m
-index 190c2c3..e22bd97 100644
---- a/toxcore/toxav/group.m
-+++ b/toxcore/toxav/group.m
-@@ -22,7 +22,7 @@
- #include "config.h"
- #endif /* HAVE_CONFIG_H */
- 
--#include "group.h"
-+#include "groupav.h"
- #include "../toxcore/util.h"
- #include "../toxcore/logger.h"
- 
-diff --git a/toxcore/toxav/toxav_old.m b/toxcore/toxav/toxav_old.m
-index 7d7e5e7..bb9d811 100644
---- a/toxcore/toxav/toxav_old.m
-+++ b/toxcore/toxav/toxav_old.m
-@@ -23,7 +23,7 @@
-  */
- 
- #include "toxav.h"
--#include "group.h"
-+#include "groupav.h"
- 
- /* Create a new toxav group.
-  *
 diff --git a/toxcore/toxcore/crypto_core.h b/toxcore/toxcore/crypto_core.h
-index eefb1d9..9147d00 100644
+index 2e89896..5c4bb70 100644
 --- a/toxcore/toxcore/crypto_core.h
 +++ b/toxcore/toxcore/crypto_core.h
 @@ -27,7 +27,7 @@
@@ -75,12 +36,12 @@ index eefb1d9..9147d00 100644
 +#include "sodium.h"
  #else
  #include <crypto_box.h>
- #include <randombytes.h>
+ #include <crypto_hash_sha256.h>
 diff --git a/toxcore/toxcore/network.m b/toxcore/toxcore/network.m
-index 965e65f..2a4e854 100644
+index 386f8c1..b441273 100644
 --- a/toxcore/toxcore/network.m
 +++ b/toxcore/toxcore/network.m
-@@ -437,7 +437,7 @@ void networking_poll(Networking_Core *net)
+@@ -457,7 +457,7 @@ void networking_poll(Networking_Core *net, void *userdata)
  
  #ifndef VANILLA_NACL
  /* Used for sodium_init() */
@@ -88,4 +49,4 @@ index 965e65f..2a4e854 100644
 +#include "sodium.h"
  #endif
  
- uint8_t at_startup_ran = 0;
+ static uint8_t at_startup_ran = 0;

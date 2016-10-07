@@ -24,11 +24,11 @@
 #define TCP_SERVER_H
 
 #include "crypto_core.h"
-#include "onion.h"
 #include "list.h"
+#include "onion.h"
 
 #ifdef TCP_SERVER_USE_EPOLL
-#include "sys/epoll.h"
+#include <sys/epoll.h>
 #endif
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(WIN32) || defined(__MACH__)
@@ -89,7 +89,6 @@ struct TCP_Priority_List {
 };
 
 typedef struct TCP_Secure_Connection {
-    uint8_t status;
     sock_t  sock;
     uint8_t public_key[crypto_box_PUBLICKEYBYTES];
     uint8_t recv_nonce[crypto_box_NONCEBYTES]; /* Nonce of received packets. */
@@ -97,12 +96,13 @@ typedef struct TCP_Secure_Connection {
     uint8_t shared_key[crypto_box_BEFORENMBYTES];
     uint16_t next_packet_length;
     struct {
-        uint8_t status; /* 0 if not used, 1 if other is offline, 2 if other is online. */
         uint8_t public_key[crypto_box_PUBLICKEYBYTES];
         uint32_t index;
+        uint8_t status; /* 0 if not used, 1 if other is offline, 2 if other is online. */
         uint8_t other_id;
     } connections[NUM_CLIENT_CONNECTIONS];
     uint8_t last_packet[2 + MAX_PACKET_SIZE];
+    uint8_t status;
     uint16_t last_packet_length;
     uint16_t last_packet_sent;
 
@@ -115,31 +115,10 @@ typedef struct TCP_Secure_Connection {
 } TCP_Secure_Connection;
 
 
-typedef struct {
-    Onion *onion;
+typedef struct TCP_Server TCP_Server;
 
-#ifdef TCP_SERVER_USE_EPOLL
-    int efd;
-    uint64_t last_run_pinged;
-#endif
-    sock_t *socks_listening;
-    unsigned int num_listening_socks;
-
-    uint8_t public_key[crypto_box_PUBLICKEYBYTES];
-    uint8_t secret_key[crypto_box_SECRETKEYBYTES];
-    TCP_Secure_Connection incomming_connection_queue[MAX_INCOMMING_CONNECTIONS];
-    uint16_t incomming_connection_queue_index;
-    TCP_Secure_Connection unconfirmed_connection_queue[MAX_INCOMMING_CONNECTIONS];
-    uint16_t unconfirmed_connection_queue_index;
-
-    TCP_Secure_Connection *accepted_connection_array;
-    uint32_t size_accepted_connections;
-    uint32_t num_accepted_connections;
-
-    uint64_t counter;
-
-    BS_LIST accepted_key_list;
-} TCP_Server;
+const uint8_t *tcp_server_public_key(const TCP_Server *tcp_server);
+size_t tcp_server_listen_count(const TCP_Server *tcp_server);
 
 /* Create new TCP server instance.
  */

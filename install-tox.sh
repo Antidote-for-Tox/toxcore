@@ -27,6 +27,3 @@ done
 echo "Applying install-tox.patch"
 git apply install-tox.patch
 
-echo "Renaming toxav/group.* files to toxav/groupav.*"
-mv -v $OUTPUT/toxav/group.h $OUTPUT/toxav/groupav.h
-mv -v $OUTPUT/toxav/group.m $OUTPUT/toxav/groupav.m
