@@ -29,9 +29,6 @@
 
 #include "DHT.h"
 
-#ifdef ENABLE_ASSOC_DHT
-#include "assoc.h"
-#endif
 #include "LAN_discovery.h"
 #include "logger.h"
 #include "misc_tools.h"
@@ -174,6 +171,86 @@ void DHT_get_shared_key_recv(DHT *dht, uint8_t *shared_key, const uint8_t *publi
 void DHT_get_shared_key_sent(DHT *dht, uint8_t *shared_key, const uint8_t *public_key)
 {
     get_shared_key(&dht->shared_keys_sent, shared_key, dht->self_secret_key, public_key);
+}
+
+/* Create a request to peer.
+ * send_public_key and send_secret_key are the pub/secret keys of the sender.
+ * recv_public_key is public key of receiver.
+ * packet must be an array of MAX_CRYPTO_REQUEST_SIZE big.
+ * Data represents the data we send with the request with length being the length of the data.
+ * request_id is the id of the request (32 = friend request, 254 = ping request).
+ *
+ *  return -1 on failure.
+ *  return the length of the created packet on success.
+ */
+int create_request(const uint8_t *send_public_key, const uint8_t *send_secret_key, uint8_t *packet,
+                   const uint8_t *recv_public_key, const uint8_t *data, uint32_t length, uint8_t request_id)
+{
+    if (!send_public_key || !packet || !recv_public_key || !data) {
+        return -1;
+    }
+
+    if (MAX_CRYPTO_REQUEST_SIZE < length + 1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 +
+            crypto_box_MACBYTES) {
+        return -1;
+    }
+
+    uint8_t *nonce = packet + 1 + crypto_box_PUBLICKEYBYTES * 2;
+    new_nonce(nonce);
+    uint8_t temp[MAX_CRYPTO_REQUEST_SIZE]; // TODO(irungentoo): sodium_memzero before exit function
+    memcpy(temp + 1, data, length);
+    temp[0] = request_id;
+    int len = encrypt_data(recv_public_key, send_secret_key, nonce, temp, length + 1,
+                           1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + packet);
+
+    if (len == -1) {
+        return -1;
+    }
+
+    packet[0] = NET_PACKET_CRYPTO;
+    memcpy(packet + 1, recv_public_key, crypto_box_PUBLICKEYBYTES);
+    memcpy(packet + 1 + crypto_box_PUBLICKEYBYTES, send_public_key, crypto_box_PUBLICKEYBYTES);
+
+    return len + 1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES;
+}
+
+/* Puts the senders public key in the request in public_key, the data from the request
+ * in data if a friend or ping request was sent to us and returns the length of the data.
+ * packet is the request packet and length is its length.
+ *
+ *  return -1 if not valid request.
+ */
+int handle_request(const uint8_t *self_public_key, const uint8_t *self_secret_key, uint8_t *public_key, uint8_t *data,
+                   uint8_t *request_id, const uint8_t *packet, uint16_t length)
+{
+    if (!self_public_key || !public_key || !data || !request_id || !packet) {
+        return -1;
+    }
+
+    if (length <= crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 + crypto_box_MACBYTES ||
+            length > MAX_CRYPTO_REQUEST_SIZE) {
+        return -1;
+    }
+
+    if (public_key_cmp(packet + 1, self_public_key) != 0) {
+        return -1;
+    }
+
+    memcpy(public_key, packet + 1 + crypto_box_PUBLICKEYBYTES, crypto_box_PUBLICKEYBYTES);
+    const uint8_t *nonce = packet + 1 + crypto_box_PUBLICKEYBYTES * 2;
+    uint8_t temp[MAX_CRYPTO_REQUEST_SIZE]; // TODO(irungentoo): sodium_memzero before exit function
+    int len1 = decrypt_data(public_key, self_secret_key, nonce,
+                            packet + 1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES,
+                            length - (crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1), temp);
+
+    if (len1 == -1 || len1 == 0) {
+        return -1;
+    }
+
+    request_id[0] = temp[0];
+    --len1;
+    memcpy(data, temp + 1, len1);
+    return len1;
 }
 
 void to_net_family(IP *ip)
@@ -693,60 +770,7 @@ int get_close_nodes(const DHT *dht, const uint8_t *public_key, Node_format *node
                     uint8_t is_LAN, uint8_t want_good)
 {
     memset(nodes_list, 0, MAX_SENT_NODES * sizeof(Node_format));
-#ifdef ENABLE_ASSOC_DHT
-
-    if (!dht->assoc)
-#endif
-        return get_somewhat_close_nodes(dht, public_key, nodes_list, sa_family, is_LAN, want_good);
-
-#ifdef ENABLE_ASSOC_DHT
-    // TODO(irungentoo): assoc, sa_family 0 (don't care if ipv4 or ipv6) support.
-    Client_data *result[MAX_SENT_NODES];
-
-    Assoc_close_entries request;
-    memset(&request, 0, sizeof(request));
-    request.count = MAX_SENT_NODES;
-    request.count_good = MAX_SENT_NODES - 2; /* allow 2 'indirect' nodes */
-    request.result = result;
-    request.wanted_id = public_key;
-    request.flags = (is_LAN ? LANOk : 0) + (sa_family == AF_INET ? ProtoIPv4 : ProtoIPv6);
-
-    uint8_t num_found = Assoc_get_close_entries(dht->assoc, &request);
-
-    if (!num_found) {
-        LOGGER_DEBUG(dht->log, "get_close_nodes(): Assoc_get_close_entries() returned zero nodes");
-        return get_somewhat_close_nodes(dht, public_key, nodes_list, sa_family, is_LAN, want_good);
-    }
-
-    LOGGER_DEBUG(dht->log, "get_close_nodes(): Assoc_get_close_entries() returned %i 'direct' and %i 'indirect' nodes",
-                 request.count_good, num_found - request.count_good);
-
-    uint8_t i, num_returned = 0;
-
-    for (i = 0; i < num_found; i++) {
-        Client_data *client = result[i];
-
-        if (client) {
-            id_copy(nodes_list[num_returned].public_key, client->public_key);
-
-            if (sa_family == AF_INET)
-                if (ipport_isset(&client->assoc4.ip_port)) {
-                    nodes_list[num_returned].ip_port = client->assoc4.ip_port;
-                    num_returned++;
-                    continue;
-                }
-
-            if (sa_family == AF_INET6)
-                if (ipport_isset(&client->assoc6.ip_port)) {
-                    nodes_list[num_returned].ip_port = client->assoc6.ip_port;
-                    num_returned++;
-                    continue;
-                }
-        }
-    }
-
-    return num_returned;
-#endif
+    return get_somewhat_close_nodes(dht, public_key, nodes_list, sa_family, is_LAN, want_good);
 }
 
 static uint8_t cmp_public_key[crypto_box_PUBLICKEYBYTES];
@@ -1076,18 +1100,6 @@ int addto_lists(DHT *dht, IP_Port ip_port, const uint8_t *public_key)
         }
     }
 
-#ifdef ENABLE_ASSOC_DHT
-
-    if (dht->assoc) {
-        IPPTs ippts;
-
-        ippts.ip_port = ip_port;
-        ippts.timestamp = unix_time();
-
-        Assoc_add_entry(dht->assoc, public_key, &ippts, NULL, used ? 1 : 0);
-    }
-
-#endif
     return used;
 }
 
@@ -1144,18 +1156,6 @@ static int returnedip_ports(DHT *dht, IP_Port ip_port, const uint8_t *public_key
     }
 
 end:
-#ifdef ENABLE_ASSOC_DHT
-
-    if (dht->assoc) {
-        IPPTs ippts;
-        ippts.ip_port = ip_port;
-        ippts.timestamp = temp_time;
-        /* this is only a hear-say entry, so ret-ipp is NULL, but used is required
-         * to decide how valuable it is ("used" may throw an "unused" entry out) */
-        Assoc_add_entry(dht->assoc, public_key, &ippts, NULL, used ? 1 : 0);
-    }
-
-#endif
     return 0;
 }
 
@@ -1708,16 +1708,6 @@ void DHT_getnodes(DHT *dht, const IP_Port *from_ipp, const uint8_t *from_id, con
 
 void DHT_bootstrap(DHT *dht, IP_Port ip_port, const uint8_t *public_key)
 {
-    /*#ifdef ENABLE_ASSOC_DHT
-       if (dht->assoc) {
-           IPPTs ippts;
-           ippts.ip_port = ip_port;
-           ippts.timestamp = 0;
-
-           Assoc_add_entry(dht->assoc, public_key, &ippts, NULL, 0);
-       }
-       #endif*/
-
     getnodes(dht, ip_port, public_key, dht->self_public_key, NULL);
 }
 int DHT_bootstrap_from_address(DHT *dht, const char *address, uint8_t ipv6enabled,
@@ -2620,9 +2610,6 @@ DHT *new_DHT(Logger *log, Networking_Core *net)
 
     ping_array_init(&dht->dht_ping_array, DHT_PING_ARRAY_SIZE, PING_TIMEOUT);
     ping_array_init(&dht->dht_harden_ping_array, DHT_PING_ARRAY_SIZE, PING_TIMEOUT);
-#ifdef ENABLE_ASSOC_DHT
-    dht->assoc = new_Assoc_default(dht->log, dht->self_public_key);
-#endif
     uint32_t i;
 
     for (i = 0; i < DHT_FAKE_FRIEND_NUMBER; ++i) {
@@ -2658,20 +2645,10 @@ void do_DHT(DHT *dht)
 #if DHT_HARDENING
     do_hardening(dht);
 #endif
-#ifdef ENABLE_ASSOC_DHT
-
-    if (dht->assoc) {
-        do_Assoc(dht->assoc, dht);
-    }
-
-#endif
     dht->last_run = unix_time();
 }
 void kill_DHT(DHT *dht)
 {
-#ifdef ENABLE_ASSOC_DHT
-    kill_Assoc(dht->assoc);
-#endif
     networking_registerhandler(dht->net, NET_PACKET_GET_NODES, NULL, NULL);
     networking_registerhandler(dht->net, NET_PACKET_SEND_NODES_IPV6, NULL, NULL);
     cryptopacket_registerhandler(dht, CRYPTO_PACKET_NAT_PING, NULL, NULL);

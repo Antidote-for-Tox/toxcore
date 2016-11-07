@@ -27,7 +27,6 @@
 
 #include "Messenger.h"
 
-#include "assoc.h"
 #include "logger.h"
 #include "network.h"
 #include "util.h"
@@ -1886,7 +1885,7 @@ static int friend_already_added(const uint8_t *real_pk, void *data)
 }
 
 /* Run this at startup. */
-Messenger *new_messenger(Logger *log, Messenger_Options *options, unsigned int *error)
+Messenger *new_messenger(Messenger_Options *options, unsigned int *error)
 {
     Messenger *m = (Messenger *)calloc(1, sizeof(Messenger));
 
@@ -1894,8 +1893,18 @@ Messenger *new_messenger(Logger *log, Messenger_Options *options, unsigned int *
         *error = MESSENGER_ERROR_OTHER;
     }
 
-    if (! m) {
+    if (!m) {
         return NULL;
+    }
+
+    Logger *log = NULL;
+
+    if (options && options->log_callback) {
+        log = logger_new();
+
+        if (log != NULL) {
+            logger_callback_log(log, options->log_callback, m, options->log_user_data);
+        }
     }
 
     m->log = log;
@@ -2013,6 +2022,7 @@ void kill_messenger(Messenger *m)
         clear_receipts(m, i);
     }
 
+    logger_kill(m->log);
     free(m->friendlist);
     free(m);
 }
@@ -2501,11 +2511,6 @@ void do_messenger(Messenger *m, void *userdata)
     connection_status_cb(m, userdata);
 
     if (unix_time() > lastdump + DUMPING_CLIENTS_FRIENDS_EVERY_N_SECONDS) {
-
-#ifdef ENABLE_ASSOC_DHT
-        Assoc_status(m->log, m->dht->assoc);
-#endif
-
         lastdump = unix_time();
         uint32_t client, last_pinged;
 
