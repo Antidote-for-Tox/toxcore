@@ -179,7 +179,7 @@ const VERSION_MINOR                = 0;
  * The patch or revision number. Incremented when bugfixes are applied without
  * changing any functionality or API or ABI.
  */
-const VERSION_PATCH                = 4;
+const VERSION_PATCH                = 5;
 
 /**
  * A macro to check at preprocessing time whether the client code is compatible
@@ -433,9 +433,10 @@ static class options {
    * in future versions of the API, code that allocates it itself will become
    * incompatible.
    *
-   * The memory layout of this struct (size, alignment, and field order) is not
-   * part of the ABI. To remain compatible, prefer to use $new to allocate the
-   * object and accessor functions to set the members.
+   * @deprecated The memory layout of this struct (size, alignment, and field
+   * order) is not part of the ABI. To remain compatible, prefer to use $new to
+   * allocate the object and accessor functions to set the members. The struct
+   * will become opaque (i.e. the definition will become private) in v0.1.0.
    */
   struct this [get, set] {
     /**
@@ -517,6 +518,11 @@ static class options {
      * to disable it.
      */
     uint16_t tcp_port;
+
+    /**
+     * Enables or disables UDP hole-punching in toxcore. (Default: enabled).
+     */
+    bool hole_punching_enabled;
 
     namespace savedata {
       /**
@@ -844,14 +850,17 @@ inline namespace self {
 
   uint32_t nospam {
     /**
-     * Set the 4-byte nospam part of the address.
+     * Set the 4-byte nospam part of the address. This value is expected in host
+     * byte order. I.e. 0x12345678 will form the bytes [12, 34, 56, 78] in the
+     * nospam part of the Tox friend address.
      *
      * @param nospam Any 32 bit unsigned integer.
      */
     set();
 
     /**
-     * Get the 4-byte nospam part of the address.
+     * Get the 4-byte nospam part of the address. This value is returned in host
+     * byte order.
      */
     get();
   }

@@ -180,7 +180,7 @@ uint32_t tox_version_minor(void);
  * The patch or revision number. Incremented when bugfixes are applied without
  * changing any functionality or API or ABI.
  */
-#define TOX_VERSION_PATCH              4
+#define TOX_VERSION_PATCH              5
 
 uint32_t tox_version_patch(void);
 
@@ -482,9 +482,10 @@ typedef void tox_log_cb(Tox *tox, TOX_LOG_LEVEL level, const char *file, uint32_
  * in future versions of the API, code that allocates it itself will become
  * incompatible.
  *
- * The memory layout of this struct (size, alignment, and field order) is not
- * part of the ABI. To remain compatible, prefer to use tox_options_new to allocate the
- * object and accessor functions to set the members.
+ * @deprecated The memory layout of this struct (size, alignment, and field
+ * order) is not part of the ABI. To remain compatible, prefer to use tox_options_new to
+ * allocate the object and accessor functions to set the members. The struct
+ * will become opaque (i.e. the definition will become private) in v0.1.0.
  */
 struct Tox_Options {
 
@@ -575,6 +576,12 @@ struct Tox_Options {
 
 
     /**
+     * Enables or disables UDP hole-punching in toxcore. (Default: enabled).
+     */
+    bool hole_punching_enabled;
+
+
+    /**
      * The type of savedata to load from.
      */
     TOX_SAVEDATA_TYPE savedata_type;
@@ -640,6 +647,10 @@ void tox_options_set_end_port(struct Tox_Options *options, uint16_t end_port);
 uint16_t tox_options_get_tcp_port(const struct Tox_Options *options);
 
 void tox_options_set_tcp_port(struct Tox_Options *options, uint16_t tcp_port);
+
+bool tox_options_get_hole_punching_enabled(const struct Tox_Options *options);
+
+void tox_options_set_hole_punching_enabled(struct Tox_Options *options, bool hole_punching_enabled);
 
 TOX_SAVEDATA_TYPE tox_options_get_savedata_type(const struct Tox_Options *options);
 
@@ -979,14 +990,17 @@ void tox_iterate(Tox *tox, void *user_data);
 void tox_self_get_address(const Tox *tox, uint8_t *address);
 
 /**
- * Set the 4-byte nospam part of the address.
+ * Set the 4-byte nospam part of the address. This value is expected in host
+ * byte order. I.e. 0x12345678 will form the bytes [12, 34, 56, 78] in the
+ * nospam part of the Tox friend address.
  *
  * @param nospam Any 32 bit unsigned integer.
  */
 void tox_self_set_nospam(Tox *tox, uint32_t nospam);
 
 /**
- * Get the 4-byte nospam part of the address.
+ * Get the 4-byte nospam part of the address. This value is returned in host
+ * byte order.
  */
 uint32_t tox_self_get_nospam(const Tox *tox);
 
