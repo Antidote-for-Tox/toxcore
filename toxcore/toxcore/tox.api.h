@@ -173,23 +173,34 @@ const VERSION_MAJOR                = 0;
  * breaking the API or ABI. Set to 0 when the major version number is
  * incremented.
  */
-const VERSION_MINOR                = 0;
+const VERSION_MINOR                = 1;
 
 /**
  * The patch or revision number. Incremented when bugfixes are applied without
  * changing any functionality or API or ABI.
  */
-const VERSION_PATCH                = 5;
+const VERSION_PATCH                = 0;
 
 /**
  * A macro to check at preprocessing time whether the client code is compatible
- * with the installed version of Tox.
+ * with the installed version of Tox. Leading zeros in the version number are 
+ * ignored. E.g. 0.1.5 is to 0.1.4 what 1.5 is to 1.4, that is: it can add new
+ * features, but can't break the API.
  */
-#define TOX_VERSION_IS_API_COMPATIBLE(MAJOR, MINOR, PATCH)      \
-  (TOX_VERSION_MAJOR == MAJOR &&                                \
-   (TOX_VERSION_MINOR > MINOR ||                                \
-    (TOX_VERSION_MINOR == MINOR &&                              \
-     TOX_VERSION_PATCH >= PATCH)))
+#define TOX_VERSION_IS_API_COMPATIBLE(MAJOR, MINOR, PATCH)              \
+  (TOX_VERSION_MAJOR > 0 && TOX_VERSION_MAJOR == MAJOR) && (            \
+    /* 1.x.x, 2.x.x, etc. with matching major version. */               \
+    TOX_VERSION_MINOR > MINOR ||                                        \
+    TOX_VERSION_MINOR == MINOR && TOX_VERSION_PATCH >= PATCH            \
+  ) || (TOX_VERSION_MAJOR == 0 && MAJOR == 0) && (                      \
+    /* 0.x.x makes minor behave like major above. */                    \
+    (TOX_VERSION_MINOR > 0 && TOX_VERSION_MINOR == MINOR) && (          \
+      TOX_VERSION_PATCH >= PATCH                                        \
+    ) || (TOX_VERSION_MINOR == 0 && MINOR == 0) && (                    \
+      /* 0.0.x and 0.0.y are only compatible if x == y. */              \
+      TOX_VERSION_PATCH == PATCH                                        \
+    )                                                                   \
+  )
 
 /**
  * A macro to make compilation fail if the client code is not compatible with
