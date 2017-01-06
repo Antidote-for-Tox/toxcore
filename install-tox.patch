@@ -63,3 +63,16 @@ index bd56e78..9e3413e 100644
  #endif
  
  #include <string.h>
+diff --git a/toxcore/toxcore/crypto_core_mem.m b/toxcore/toxcore/crypto_core_mem.m
+index 8d46998..156eea9 100644
+--- a/toxcore/toxcore/crypto_core_mem.m
++++ b/toxcore/toxcore/crypto_core_mem.m
+@@ -22,7 +22,7 @@
+ 
+ #ifndef VANILLA_NACL
+ /* We use libsodium by default. */
+-#include <sodium.h>
++#include "sodium.h"
+ #else
+ #if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
+ #include <windows.h>
