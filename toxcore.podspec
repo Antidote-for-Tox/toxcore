@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "toxcore"
-  s.version          = "0.1.3"
+  s.version          = "0.1.4"
   s.summary          = "Cocoapods wrapper for toxcore"
   s.homepage         = "https://github.com/Antidote-for-Tox/toxcore"
   s.license          = 'GPLv3'

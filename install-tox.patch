@@ -54,9 +54,9 @@ diff --git a/toxcore/toxencryptsave/toxencryptsave.m b/toxcore/toxencryptsave/to
 index bd56e78..9e3413e 100644
 --- a/toxcore/toxencryptsave/toxencryptsave.m
 +++ b/toxcore/toxencryptsave/toxencryptsave.m
-@@ -34,7 +34,7 @@
- #include <crypto_hash_sha256.h>
+@@ -36,7 +36,7 @@
  #include "crypto_pwhash_scryptsalsa208sha256/crypto_pwhash_scryptsalsa208sha256.h"
+ #define crypto_box_MACBYTES (crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
  #else
 -#include <sodium.h>
 +#include "sodium.h"
