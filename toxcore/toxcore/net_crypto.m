@@ -903,12 +903,12 @@ static int send_data_packet(Net_Crypto *c, int crypt_connection_id, const uint8_
     }
 
     pthread_mutex_lock(&conn->mutex);
-    uint8_t packet[1 + sizeof(uint16_t) + length + CRYPTO_MAC_SIZE];
+    VLA(uint8_t, packet, 1 + sizeof(uint16_t) + length + CRYPTO_MAC_SIZE);
     packet[0] = NET_PACKET_CRYPTO_DATA;
     memcpy(packet + 1, conn->sent_nonce + (CRYPTO_NONCE_SIZE - sizeof(uint16_t)), sizeof(uint16_t));
     int len = encrypt_data_symmetric(conn->shared_key, conn->sent_nonce, data, length, packet + 1 + sizeof(uint16_t));
 
-    if (len + 1 + sizeof(uint16_t) != sizeof(packet)) {
+    if (len + 1 + sizeof(uint16_t) != SIZEOF_VLA(packet)) {
         pthread_mutex_unlock(&conn->mutex);
         return -1;
     }
@@ -916,7 +916,7 @@ static int send_data_packet(Net_Crypto *c, int crypt_connection_id, const uint8_
     increment_nonce(conn->sent_nonce);
     pthread_mutex_unlock(&conn->mutex);
 
-    return send_packet_to(c, crypt_connection_id, packet, sizeof(packet));
+    return send_packet_to(c, crypt_connection_id, packet, SIZEOF_VLA(packet));
 }
 
 /* Creates and sends a data packet with buffer_start and num to the peer using the fastest route.
@@ -931,16 +931,16 @@ static int send_data_packet_helper(Net_Crypto *c, int crypt_connection_id, uint3
         return -1;
     }
 
-    num = htonl(num);
-    buffer_start = htonl(buffer_start);
+    num = net_htonl(num);
+    buffer_start = net_htonl(buffer_start);
     uint16_t padding_length = (MAX_CRYPTO_DATA_SIZE - length) % CRYPTO_MAX_PADDING;
-    uint8_t packet[sizeof(uint32_t) + sizeof(uint32_t) + padding_length + length];
+    VLA(uint8_t, packet, sizeof(uint32_t) + sizeof(uint32_t) + padding_length + length);
     memcpy(packet, &buffer_start, sizeof(uint32_t));
     memcpy(packet + sizeof(uint32_t), &num, sizeof(uint32_t));
     memset(packet + (sizeof(uint32_t) * 2), PACKET_ID_PADDING, padding_length);
     memcpy(packet + (sizeof(uint32_t) * 2) + padding_length, data, length);
 
-    return send_data_packet(c, crypt_connection_id, packet, sizeof(packet));
+    return send_data_packet(c, crypt_connection_id, packet, SIZEOF_VLA(packet));
 }
 
 static int reset_max_speed_reached(Net_Crypto *c, int crypt_connection_id)
@@ -1042,7 +1042,7 @@ static uint16_t get_nonce_uint16(const uint8_t *nonce)
 {
     uint16_t num;
     memcpy(&num, nonce + (CRYPTO_NONCE_SIZE - sizeof(uint16_t)), sizeof(uint16_t));
-    return ntohs(num);
+    return net_ntohs(num);
 }
 
 #define DATA_NUM_THRESHOLD 21845
@@ -1072,7 +1072,7 @@ static int handle_data_packet(const Net_Crypto *c, int crypt_connection_id, uint
     uint16_t num_cur_nonce = get_nonce_uint16(nonce);
     uint16_t num;
     memcpy(&num, packet + 1, sizeof(uint16_t));
-    num = ntohs(num);
+    num = net_ntohs(num);
     uint16_t diff = num - num_cur_nonce;
     increment_nonce_number(nonce, diff);
     int len = decrypt_data_symmetric(conn->shared_key, nonce, packet + 1 + sizeof(uint16_t),
@@ -1343,8 +1343,8 @@ static int handle_data_packet_core(Net_Crypto *c, int crypt_connection_id, const
     uint32_t buffer_start, num;
     memcpy(&buffer_start, data, sizeof(uint32_t));
     memcpy(&num, data + sizeof(uint32_t), sizeof(uint32_t));
-    buffer_start = ntohl(buffer_start);
-    num = ntohl(num);
+    buffer_start = net_ntohl(buffer_start);
+    num = net_ntohl(num);
 
     uint64_t rtt_calc_time = 0;
 

@@ -27,9 +27,8 @@
 #include "config.h"
 #endif
 
+#include "ccompat.h"
 #include "crypto_core.h"
-
-#include "network.h"
 
 #include <string.h>
 
@@ -127,8 +126,8 @@ int32_t encrypt_data_symmetric(const uint8_t *secret_key, const uint8_t *nonce, 
         return -1;
     }
 
-    uint8_t temp_plain[length + crypto_box_ZEROBYTES];
-    uint8_t temp_encrypted[length + crypto_box_MACBYTES + crypto_box_BOXZEROBYTES];
+    VLA(uint8_t, temp_plain, length + crypto_box_ZEROBYTES);
+    VLA(uint8_t, temp_encrypted, length + crypto_box_MACBYTES + crypto_box_BOXZEROBYTES);
 
     memset(temp_plain, 0, crypto_box_ZEROBYTES);
     memcpy(temp_plain + crypto_box_ZEROBYTES, plain, length); // Pad the message with 32 0 bytes.
@@ -149,8 +148,8 @@ int32_t decrypt_data_symmetric(const uint8_t *secret_key, const uint8_t *nonce, 
         return -1;
     }
 
-    uint8_t temp_plain[length + crypto_box_ZEROBYTES];
-    uint8_t temp_encrypted[length + crypto_box_BOXZEROBYTES];
+    VLA(uint8_t, temp_plain, length + crypto_box_ZEROBYTES);
+    VLA(uint8_t, temp_encrypted, length + crypto_box_BOXZEROBYTES);
 
     memset(temp_encrypted, 0, crypto_box_BOXZEROBYTES);
     memcpy(temp_encrypted + crypto_box_BOXZEROBYTES, encrypted, length); // Pad the message with 16 0 bytes.
@@ -210,6 +209,20 @@ void increment_nonce(uint8_t *nonce)
         carry >>= 8;
     }
 }
+
+static uint32_t host_to_network(uint32_t x)
+{
+#if BYTE_ORDER == LITTLE_ENDIAN
+    return
+        ((x >> 24) & 0x000000FF) | // move byte 3 to byte 0
+        ((x >> 8)  & 0x0000FF00) | // move byte 2 to byte 1
+        ((x << 8)  & 0x00FF0000) | // move byte 1 to byte 2
+        ((x << 24) & 0xFF000000);  // move byte 0 to byte 3
+#else
+    return x;
+#endif
+}
+
 /* increment the given nonce by num */
 void increment_nonce_number(uint8_t *nonce, uint32_t host_order_num)
 {
@@ -218,7 +231,7 @@ void increment_nonce_number(uint8_t *nonce, uint32_t host_order_num)
      * that loop bounds and their potential underflow or overflow
      * are independent of user-controlled input (you may have heard of the Heartbleed bug).
      */
-    const uint32_t big_endian_num = htonl(host_order_num);
+    const uint32_t big_endian_num = host_to_network(host_order_num);
     const uint8_t *const num_vec = (const uint8_t *) &big_endian_num;
     uint8_t num_as_nonce[crypto_box_NONCEBYTES] = {0};
     num_as_nonce[crypto_box_NONCEBYTES - 4] = num_vec[0];

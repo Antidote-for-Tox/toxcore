@@ -69,38 +69,11 @@ size_t tcp_server_listen_count(const TCP_Server *tcp_server)
     return tcp_server->num_listening_socks;
 }
 
-/* this is needed to compile on Android below API 21
-*/
+/* This is needed to compile on Android below API 21
+ */
 #ifndef EPOLLRDHUP
 #define EPOLLRDHUP 0x2000
 #endif
-
-/* return 1 on success
- * return 0 on failure
- */
-static int bind_to_port(Socket sock, int family, uint16_t port)
-{
-    struct sockaddr_storage addr = {0};
-    size_t addrsize;
-
-    if (family == AF_INET) {
-        struct sockaddr_in *addr4 = (struct sockaddr_in *)&addr;
-
-        addrsize = sizeof(struct sockaddr_in);
-        addr4->sin_family = AF_INET;
-        addr4->sin_port = htons(port);
-    } else if (family == AF_INET6) {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&addr;
-
-        addrsize = sizeof(struct sockaddr_in6);
-        addr6->sin6_family = AF_INET6;
-        addr6->sin6_port = htons(port);
-    } else {
-        return 0;
-    }
-
-    return (bind(sock, (struct sockaddr *)&addr, addrsize) == 0);
-}
 
 /* Set the size of the connection list to numfriends.
  *
@@ -265,7 +238,7 @@ uint16_t read_TCP_length(Socket sock)
             return 0;
         }
 
-        length = ntohs(length);
+        length = net_ntohs(length);
 
         if (length > MAX_PACKET_SIZE) {
             return ~0;
@@ -325,7 +298,7 @@ int read_packet_TCP_secure_connection(Socket sock, uint16_t *next_packet_length,
         return -1;
     }
 
-    uint8_t data_encrypted[*next_packet_length];
+    VLA(uint8_t, data_encrypted, *next_packet_length);
     int len_packet = read_TCP_packet(sock, data_encrypted, *next_packet_length);
 
     if (len_packet != *next_packet_length) {
@@ -458,18 +431,18 @@ static int write_packet_TCP_secure_connection(TCP_Secure_Connection *con, const 
         }
     }
 
-    uint8_t packet[sizeof(uint16_t) + length + CRYPTO_MAC_SIZE];
+    VLA(uint8_t, packet, sizeof(uint16_t) + length + CRYPTO_MAC_SIZE);
 
-    uint16_t c_length = htons(length + CRYPTO_MAC_SIZE);
+    uint16_t c_length = net_htons(length + CRYPTO_MAC_SIZE);
     memcpy(packet, &c_length, sizeof(uint16_t));
     int len = encrypt_data_symmetric(con->shared_key, con->sent_nonce, data, length, packet + sizeof(uint16_t));
 
-    if ((unsigned int)len != (sizeof(packet) - sizeof(uint16_t))) {
+    if ((unsigned int)len != (SIZEOF_VLA(packet) - sizeof(uint16_t))) {
         return -1;
     }
 
     if (priority) {
-        len = sendpriority ? send(con->sock, (const char *)packet, sizeof(packet), MSG_NOSIGNAL) : 0;
+        len = sendpriority ? send(con->sock, (const char *)packet, SIZEOF_VLA(packet), MSG_NOSIGNAL) : 0;
 
         if (len <= 0) {
             len = 0;
@@ -477,14 +450,14 @@ static int write_packet_TCP_secure_connection(TCP_Secure_Connection *con, const 
 
         increment_nonce(con->sent_nonce);
 
-        if ((unsigned int)len == sizeof(packet)) {
+        if ((unsigned int)len == SIZEOF_VLA(packet)) {
             return 1;
         }
 
-        return add_priority(con, packet, sizeof(packet), len);
+        return add_priority(con, packet, SIZEOF_VLA(packet), len);
     }
 
-    len = send(con->sock, (const char *)packet, sizeof(packet), MSG_NOSIGNAL);
+    len = send(con->sock, (const char *)packet, SIZEOF_VLA(packet), MSG_NOSIGNAL);
 
     if (len <= 0) {
         return 0;
@@ -492,12 +465,12 @@ static int write_packet_TCP_secure_connection(TCP_Secure_Connection *con, const 
 
     increment_nonce(con->sent_nonce);
 
-    if ((unsigned int)len == sizeof(packet)) {
+    if ((unsigned int)len == SIZEOF_VLA(packet)) {
         return 1;
     }
 
-    memcpy(con->last_packet, packet, sizeof(packet));
-    con->last_packet_length = sizeof(packet);
+    memcpy(con->last_packet, packet, SIZEOF_VLA(packet));
+    con->last_packet_length = SIZEOF_VLA(packet);
     con->last_packet_sent = len;
     return 1;
 }
@@ -737,12 +710,12 @@ static int handle_TCP_oob_send(TCP_Server *TCP_server, uint32_t con_id, const ui
     int other_index = get_TCP_connection_index(TCP_server, public_key);
 
     if (other_index != -1) {
-        uint8_t resp_packet[1 + CRYPTO_PUBLIC_KEY_SIZE + length];
+        VLA(uint8_t, resp_packet, 1 + CRYPTO_PUBLIC_KEY_SIZE + length);
         resp_packet[0] = TCP_PACKET_OOB_RECV;
         memcpy(resp_packet + 1, con->public_key, CRYPTO_PUBLIC_KEY_SIZE);
         memcpy(resp_packet + 1 + CRYPTO_PUBLIC_KEY_SIZE, data, length);
         write_packet_TCP_secure_connection(&TCP_server->accepted_connection_array[other_index], resp_packet,
-                                           sizeof(resp_packet), 0);
+                                           SIZEOF_VLA(resp_packet), 0);
     }
 
     return 0;
@@ -800,11 +773,11 @@ static int handle_onion_recv_1(void *object, IP_Port dest, const uint8_t *data, 
         return 1;
     }
 
-    uint8_t packet[1 + length];
+    VLA(uint8_t, packet, 1 + length);
     memcpy(packet + 1, data, length);
     packet[0] = TCP_PACKET_ONION_RESPONSE;
 
-    if (write_packet_TCP_secure_connection(con, packet, sizeof(packet), 0) != 1) {
+    if (write_packet_TCP_secure_connection(con, packet, SIZEOF_VLA(packet), 0) != 1) {
         return 1;
     }
 
@@ -931,7 +904,7 @@ static int handle_TCP_packet(TCP_Server *TCP_server, uint32_t con_id, const uint
 
             uint32_t index = con->connections[c_id].index;
             uint8_t other_c_id = con->connections[c_id].other_id + NUM_RESERVED_PORTS;
-            uint8_t new_data[length];
+            VLA(uint8_t, new_data, length);
             memcpy(new_data, data, length);
             new_data[0] = other_c_id;
             int ret = write_packet_TCP_secure_connection(&TCP_server->accepted_connection_array[index], new_data, length, 0);
@@ -1005,7 +978,7 @@ static int accept_connection(TCP_Server *TCP_server, Socket sock)
 
 static Socket new_listening_TCP_socket(int family, uint16_t port)
 {
-    Socket sock = socket(family, SOCK_STREAM, IPPROTO_TCP);
+    Socket sock = net_socket(family, TOX_SOCK_STREAM, TOX_PROTO_TCP);
 
     if (!sock_valid(sock)) {
         return ~0;
