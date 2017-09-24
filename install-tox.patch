@@ -76,3 +76,19 @@ index 8d46998..156eea9 100644
  #else
  #if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
  #include <windows.h>
+diff --git a/toxcore/toxav/video.m b/toxcore/toxav/video.m
+index c84e89f..b817089 100644
+--- a/toxcore/toxav/video.m
++++ b/toxcore/toxav/video.m
+@@ -84,8 +84,9 @@ VCSession *vc_new(Logger *log, ToxAV *av, uint32_t friend_number, toxav_video_re
+ #endif
+     cfg.g_lag_in_frames = 0;
+     cfg.kf_min_dist = 0;
+-    cfg.kf_max_dist = 48;
+-    cfg.kf_mode = VPX_KF_AUTO;
++    cfg.kf_max_dist = 10; /* a full frame every 10 frames minimum (can be more often, codec decides automatically) */
++    cfg.kf_mode = VPX_KF_AUTO; /* Encoder determines optimal placement automatically */
++    cfg.rc_end_usage = VPX_CQ; /* Constrained Quality (CQ) mode -> give codec a hint that we may be on low bandwidth connection */
+ 
+     rc = vpx_codec_enc_init(vc->encoder, VIDEO_CODEC_ENCODER_INTERFACE, &cfg, 0);
+ 
